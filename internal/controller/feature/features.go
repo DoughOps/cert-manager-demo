@@ -161,7 +161,7 @@ const (
 	// Owner: @wallrj
 	// Alpha: v1.18.0
 	// Beta: v1.18.0
-	// GA: v1.20.0
+	// DoughOps: retain the v1.19 opt-out in v1.20.3.
 	//
 	// DefaultPrivateKeyRotationPolicyAlways change the default value of
 	// `Certificate.Spec.PrivateKey.RotationPolicy` to `Always`.
@@ -222,7 +222,7 @@ var defaultCertManagerFeatureGates = map[featuregate.Feature]featuregate.Feature
 	NameConstraints:                                  {Default: true, PreRelease: featuregate.Beta},
 	OtherNames:                                       {Default: true, PreRelease: featuregate.Beta},
 	UseDomainQualifiedFinalizer:                      {Default: true, PreRelease: featuregate.GA},
-	DefaultPrivateKeyRotationPolicyAlways:            {Default: true, PreRelease: featuregate.GA},
+	DefaultPrivateKeyRotationPolicyAlways:            {Default: true, PreRelease: featuregate.Beta},
 	ACMEHTTP01IngressPathTypeExact:                   {Default: true, PreRelease: featuregate.Beta},
 
 	// NB: Deprecated + removed feature gates are kept here.

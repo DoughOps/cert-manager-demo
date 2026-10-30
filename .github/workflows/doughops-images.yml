@@ -1,0 +1,90 @@
+name: DoughOps cert-manager images
+
+on:
+  pull_request:
+  push:
+    branches: [master, main, doughops-v1.20.3-rotation, release-1.20]
+    tags: ['v1.20.3-doughops.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doughops-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Use the repository's checksum-verified, pinned toolchain and test assets.
+      - run: make _bin/tools/go _bin/tools/etcd _bin/tools/kube-apiserver _bin/tools/kubectl
+      - name: Certificate unit tests
+        env:
+          GOFLAGS: -mod=readonly
+          GOMAXPROCS: '3'
+        run: _bin/tools/go test -p 3 -count=1 ./internal/apis/certmanager/v1 ./internal/apis/certmanager/validation ./pkg/controller/certificates/...
+      - name: Private key rotation integration tests
+        working-directory: test/integration
+        env:
+          GOFLAGS: -mod=readonly
+          GOMAXPROCS: '3'
+          KUBEBUILDER_ASSETS: ${{ github.workspace }}/_bin/tools
+        run: ../../_bin/tools/go test -p 3 -count=1 -timeout=10m -v -run 'TestDefaultPrivateKeyRotation|TestGeneratesNewPrivateKey' ./certificates
+
+  images:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [controller, webhook, cainjector, acmesolver, startupapicheck]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image names and tags
+        id: meta
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}/${COMPONENT}"
+          version="v1.20.3-doughops-${GITHUB_SHA:0:12}"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build linux/amd64 using upstream containers and license notices
+        env:
+          COMPONENT: ${{ matrix.component }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: make "_bin/containers/cert-manager-${COMPONENT}-linux-amd64.tar" VERSION="$VERSION" GOBUILDPROCS=3
+      - name: Verify packaged executable
+        env:
+          COMPONENT: ${{ matrix.component }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: docker run --rm "cert-manager-${COMPONENT}-amd64:${VERSION}" --help
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push commit and release tags
+        if: github.event_name != 'pull_request'
+        env:
+          COMPONENT: ${{ matrix.component }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          IMAGE: ${{ steps.meta.outputs.repository }}
+        run: |
+          set -euo pipefail
+          docker tag "cert-manager-${COMPONENT}-amd64:${VERSION}" "${IMAGE}:${VERSION}"
+          docker push "${IMAGE}:${VERSION}"
+          if [[ "$GITHUB_REF" == refs/tags/v1.20.3-doughops.* ]]; then
+            docker tag "${IMAGE}:${VERSION}" "${IMAGE}:${GITHUB_REF_NAME}"
+            docker push "${IMAGE}:${GITHUB_REF_NAME}"
+          fi
+          echo "Published ${IMAGE}:${VERSION} (linux/amd64)" >> "$GITHUB_STEP_SUMMARY"

@@ -1,3 +1,6 @@
+> DoughOps fork: based on cert-manager **v1.20.3**, with the v1.19 private key
+> rotation opt-out restored. See [configuration, tests and GHCR images](docs/doughops-v1.20.3.md).
+
 <p align="center">
   <img src="./logo/logo-small.png" height="256" width="256" alt="cert-manager project logo" />
 </p>

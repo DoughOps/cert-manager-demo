@@ -16,7 +16,7 @@ ARG BASE_IMAGE
 
 FROM $BASE_IMAGE
 
-LABEL org.opencontainers.image.source="https://github.com/cert-manager/cert-manager"
+LABEL org.opencontainers.image.source="https://github.com/DoughOps/cert-manager-demo"
 
 COPY startupapicheck /startupapicheck
 COPY cert-manager.license /licenses/LICENSE
